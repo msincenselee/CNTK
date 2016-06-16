@@ -1694,28 +1694,56 @@ public:
         if (inputIndex == 0) // derivative with respect to the input.
         {
             auto sliceOutputGrad = GradientFor(fr);
-            auto sliceInputValue = Input(0)->ValueFor(fr);
             const Matrix<ElemType>& scale = Input(1)->Value();
-            const Matrix<ElemType>& bias = Input(2)->Value();
 
             auto sliceInputGrad = Input(0)->GradientFor(fr);
-            m_dScale->Resize(scale);
-            m_dBias->Resize(bias);
-            // Compute all derivatives in one step. Save derivatives with respect to scale and bias in temp matrices.
-            m_bnEng->Backward(sliceInputValue, sliceOutputGrad, sliceInputGrad, scale,
-                                              *m_saveMean, *m_saveInvStdDev, *m_dScale, *m_dBias);
+
+            if (m_lockedDown)
+            {
+                // The parameters of BN doesn't need to be updated.
+                // Calculate the gradient for output directly
+                Matrix<ElemType>& runInvStdDev = Input(4)->Value();
+                m_tempMatrix->AssignElementProductOf(runInvStdDev, scale);
+                auto totalRows = sliceOutputGrad.GetNumRows();
+                auto channelNum = scale.GetNumRows();
+                m_inputGrad->Resize(channelNum, totalRows / channelNum);
+                m_inputGrad->SetValue(0);
+                (*m_inputGrad) += *m_tempMatrix;
+                m_tempMatrix->AssignTransposeOf(*m_inputGrad);
+                m_tempMatrix->Reshape(totalRows, 1);
+                m_inputGrad->Resize(sliceOutputGrad);
+                m_inputGrad->SetValue(sliceOutputGrad);
+                m_inputGrad->ColumnElementMultiplyWith(*m_tempMatrix);
+                sliceInputGrad += *m_inputGrad;
+            }
+            else
+            {
+                auto sliceInputValue = Input(0)->ValueFor(fr);
+                const Matrix<ElemType>& bias = Input(2)->Value();
+                m_dScale->Resize(scale);
+                m_dBias->Resize(bias);
+                // Compute all derivatives in one step. Save derivatives with respect to scale and bias in temp matrices.
+                m_bnEng->Backward(sliceInputValue, sliceOutputGrad, sliceInputGrad, scale,
+                                                  *m_saveMean, *m_saveInvStdDev, *m_dScale, *m_dBias);
+            }
         }
         else if (inputIndex == 1) // derivative with respect to the scale
         {
-            // Derivative with respect to the scale was precomputed during input derivative computation.
-            Matrix<ElemType>& grad = Input(1)->Gradient();
-            grad.SetValue(grad.GetNumRows(), grad.GetNumCols(), grad.GetDeviceId(), m_dScale->Data());
+            if (!m_lockedDown)
+            {
+                // Derivative with respect to the scale was precomputed during input derivative computation.
+                Matrix<ElemType>& grad = Input(1)->Gradient();
+                grad.SetValue(grad.GetNumRows(), grad.GetNumCols(), grad.GetDeviceId(), m_dScale->Data());
+            }
         }
         else if (inputIndex == 2) // derivative with respect to the bias
         {
-            // Derivative with respect to the bias was precomputed during input derivative computation.
-            Matrix<ElemType>& grad = Input(2)->Gradient();
-            grad.SetValue(grad.GetNumRows(), grad.GetNumCols(), grad.GetDeviceId(), m_dBias->Data());
+            if (!m_lockedDown)
+            {
+                // Derivative with respect to the bias was precomputed during input derivative computation.
+                Matrix<ElemType>& grad = Input(2)->Gradient();
+                grad.SetValue(grad.GetNumRows(), grad.GetNumCols(), grad.GetDeviceId(), m_dBias->Data());
+            }
         }
         // No derivatives with respect to running mean and InvStdDev.
     }
@@ -1776,6 +1804,7 @@ public:
 
             m_saveMean->Resize(runMean);
             m_saveInvStdDev->Resize(runMean);
+            m_lockedDown = blendFactor == 1.0 && expAvgFactor == 0.0;
         }
 
         m_bnEng->Forward(sliceInputValue, scale, bias, expAvgFactor, blendFactor, runMean, runInvStdDev,
@@ -1820,25 +1849,29 @@ public:
     void RequestMatricesBeforeForwardProp(MatrixPool& matrixPool) override
     {
         Base::RequestMatricesBeforeForwardProp(matrixPool);
-            RequestMatrixFromPool(m_saveMean, matrixPool);
-            RequestMatrixFromPool(m_saveInvStdDev, matrixPool);
-        }
+        RequestMatrixFromPool(m_saveMean, matrixPool);
+        RequestMatrixFromPool(m_saveInvStdDev, matrixPool);
+    }
 
     void RequestMatricesBeforeBackprop(MatrixPool& matrixPool) override
     {
         Base::RequestMatricesBeforeBackprop(matrixPool);
-            RequestMatrixFromPool(m_dScale, matrixPool);
-            RequestMatrixFromPool(m_dBias, matrixPool);
-        }
+        RequestMatrixFromPool(m_inputGrad, matrixPool);
+        RequestMatrixFromPool(m_tempMatrix, matrixPool);
+        RequestMatrixFromPool(m_dScale, matrixPool);
+        RequestMatrixFromPool(m_dBias, matrixPool);
+    }
 
     void ReleaseMatricesAfterBackprop(MatrixPool& matrixPool) override
     {
         Base::ReleaseMatricesAfterBackprop(matrixPool);
-            ReleaseMatrixToPool(m_saveMean, matrixPool);
-            ReleaseMatrixToPool(m_saveInvStdDev, matrixPool);
-            ReleaseMatrixToPool(m_dScale, matrixPool);
-            ReleaseMatrixToPool(m_dBias, matrixPool);
-        }
+        ReleaseMatrixToPool(m_saveMean, matrixPool);
+        ReleaseMatrixToPool(m_saveInvStdDev, matrixPool);
+        ReleaseMatrixToPool(m_inputGrad, matrixPool);
+        ReleaseMatrixToPool(m_tempMatrix, matrixPool);
+        ReleaseMatrixToPool(m_dScale, matrixPool);
+        ReleaseMatrixToPool(m_dBias, matrixPool);
+    }
 
     void SetNormalizationTimeConstants(double normalizationTimeConstant, double prevNormalizationTimeConstant,
                                        double blendTimeConstant, double prevBlendTimeConstant)
@@ -1896,6 +1929,12 @@ private:
     shared_ptr<Matrix<ElemType>> m_dScale;
     // Stores bias derivatives.
     shared_ptr<Matrix<ElemType>> m_dBias;
+
+    shared_ptr<Matrix<ElemType>> m_inputGrad;
+    shared_ptr<Matrix<ElemType>> m_tempMatrix;
+
+    // Parameter to indicate whether the BN node will still be updated during training
+    bool m_lockedDown;
 
     std::unique_ptr<BatchNormEngine<ElemType>> m_bnEng;
 };
