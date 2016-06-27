@@ -4,8 +4,6 @@
 //
 #pragma once
 
-#pragma warning(disable : 4127) // conditional expression is constant
-
 namespace Microsoft { namespace MSR { namespace CNTK {
 
 // RawType - input type to the quantizer
