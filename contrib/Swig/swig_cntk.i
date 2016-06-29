@@ -4,6 +4,7 @@
 %include "std_wstring.i" 
 %include <std_vector.i>
 %include <std_map.i>
+%include <std_set.i>
 %include <std_pair.i>
 %include <windows.i>
 
@@ -48,7 +49,7 @@
 %include "CNTKLibrary.h"
 
 %template(MapVarValuePtr) std::map<CNTK::Variable, CNTK::ValuePtr>;
-/*%template(VarSet) std::unordered_set<Variable>;*/
+%template(VarSet) std::set<CNTK::Variable>;
 
 
 %{
@@ -60,9 +61,7 @@ namespace CNTK {
 %}
 
 %extend CNTK::NDArrayView {
-    const float* DataBufferFloat() const {
-        return (*self).DataBuffer<float>();
-    }
+    %template(DataBufferFloat) DataBuffer<float>;
 }
 
 %extend CNTK::NDShape {
