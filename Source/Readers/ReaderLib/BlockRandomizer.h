@@ -46,7 +46,7 @@ public:
         int verbosity,
         size_t randomizationRangeInSamples,
         IDataDeserializerPtr deserializer,
-        bool shouldRandomize,
+        bool shouldPrefetch,
         DecimationMode decimationMode = DecimationMode::chunk,
         bool useLegacyRandomization = false,
         bool multithreadedGetNextSequences = false);

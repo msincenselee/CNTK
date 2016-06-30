@@ -21,7 +21,7 @@ BlockRandomizer::BlockRandomizer(
     int verbosity,
     size_t randomizationRangeInSamples,
     IDataDeserializerPtr deserializer,
-    bool shouldRandomize,
+    bool shouldPrefetch,
     DecimationMode decimationMode,
     bool useLegacyRandomization,
     bool multithreadedGetNextSequence)
@@ -37,7 +37,7 @@ BlockRandomizer::BlockRandomizer(
       m_chunkRandomizer(std::make_shared<ChunkRandomizer>(deserializer, randomizationRangeInSamples, useLegacyRandomization)),
       m_multithreadedGetNextSequences(multithreadedGetNextSequence),
       m_prefetchedChunk(CHUNKID_MAX),
-      m_shouldPrefetch(shouldRandomize)
+      m_shouldPrefetch(shouldPrefetch)
 {
     assert(deserializer != nullptr);
 
