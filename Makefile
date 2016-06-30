@@ -800,24 +800,26 @@ $(CNTK_CORE_BS): $(SOURCEDIR)/CNTK/BrainScript/CNTKCoreLib/CNTK.core.bs
 ########################################
 # Unit Tests
 ########################################
-unittests : $(UNITTESTS_EVAL)
 
 BOOSTLIB_PATH = /usr/lib/x86_64-linux-gnu
 
 UNITTEST_EVAL_SRC = \
-	$(SOURCEDIR)/Tests/UnitTests/EvalExtendedTests.cpp \
-	$(SOURCEDIR)/Tests/UnitTests/stdafx.cpp
+	$(SOURCEDIR)/../Tests/UnitTests/EvalTests/EvalExtendedTests.cpp \
+	$(SOURCEDIR)/../Tests/UnitTests/EvalTests/stdafx.cpp
 
-UNITTEST_EVAL_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(UNITEST_EVAL_SRC)))
+UNITTEST_EVAL_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(UNITTEST_EVAL_SRC))
 
-UNITTESTS_EVAL := $(BINDIR)/evaltests
-ALL += $(UNITTESTS_EVAL)
+UNITTEST_EVAL := $(BINDIR)/evaltests
+ALL += $(UNITTEST_EVAL)
+SRC += $(UNITTEST_EVAL_SRC)
 
 $(UNITTEST_EVAL): $(UNITTEST_EVAL_OBJ) | $(EVAL_LIB) $(CNTKMATH_LIB)
 	@echo $(SEPARATOR)
 	@mkdir -p $(dir $@)
 	@echo building $(UNITTEST_EVAL) for $(ARCH) with build type $(BUILDTYPE)
-	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR)) $(patsubst %,$(RPATH)%, $(BOOSTLIB_PATH)) -o $@ $^ -lboost_unit_test_framework -l$(EVAL) -l$(CNTKMATH) 
+	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR) $(BOOSTLIB_PATH)) -o $@ $^ -lboost_unit_test_framework -l$(EVAL) -l$(CNTKMATH) 
+
+unittests : $(UNITTEST_EVAL)
 
 ########################################
 # General compile and dependency rules
@@ -843,7 +845,7 @@ $(OBJDIR)/%.o : %.cu $(BUILD_CONFIGURATION)
 	@mkdir -p $(dir $@)
 	$(NVCC) -c $< -o $@ $(COMMON_FLAGS) $(CUFLAGS) $(INCLUDEPATH:%=-I%) -Xcompiler "-fPIC -Werror"
 
-$(OBJDIR)/%.o : %.cpp $(BUILD_CONFIGURATION)
+$(OBJDIR)/%.o : %.cpp $(BUILD_CONFIGURATION) 
 	@echo $(SEPARATOR)
 	@echo creating $@ for $(ARCH) with build type $(BUILDTYPE)
 	@mkdir -p $(dir $@)

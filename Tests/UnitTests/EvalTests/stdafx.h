@@ -9,11 +9,11 @@
 #define _SCL_SECURE_NO_WARNINGS // current API of matrix does not allow safe invokations. TODO: change api to proper one.
 
 #ifdef _WIN32
-    #include "targetver.h"
+#include "targetver.h"
+#include <windows.h>
 #endif
 
 #include <stdio.h>
-#include <windows.h>
 
 
 // TODO: reference additional headers your program requires here
