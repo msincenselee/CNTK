@@ -798,6 +798,28 @@ $(CNTK_CORE_BS): $(SOURCEDIR)/CNTK/BrainScript/CNTKCoreLib/CNTK.core.bs
 	cp -f $^ $@
 
 ########################################
+# Unit Tests
+########################################
+unittests : $(UNITTESTS_EVAL)
+
+BOOSTLIB_PATH = /usr/lib/x86_64-linux-gnu
+
+UNITTEST_EVAL_SRC = \
+	$(SOURCEDIR)/Tests/UnitTests/EvalExtendedTests.cpp \
+	$(SOURCEDIR)/Tests/UnitTests/stdafx.cpp
+
+UNITTEST_EVAL_OBJ := $(patsubst %.cpp, $(OBJDIR)/%.o, $(UNITEST_EVAL_SRC)))
+
+UNITTESTS_EVAL := $(BINDIR)/evaltests
+ALL += $(UNITTESTS_EVAL)
+
+$(UNITTEST_EVAL): $(UNITTEST_EVAL_OBJ) | $(EVAL_LIB) $(CNTKMATH_LIB)
+	@echo $(SEPARATOR)
+	@mkdir -p $(dir $@)
+	@echo building $(UNITTEST_EVAL) for $(ARCH) with build type $(BUILDTYPE)
+	$(CXX) $(LDFLAGS) $(patsubst %,-L%, $(LIBDIR)) $(patsubst %,$(RPATH)%, $(BOOSTLIB_PATH)) -o $@ $^ -lboost_unit_test_framework -l$(EVAL) -l$(CNTKMATH) 
+
+########################################
 # General compile and dependency rules
 ########################################
 
@@ -827,7 +849,7 @@ $(OBJDIR)/%.o : %.cpp $(BUILD_CONFIGURATION)
 	@mkdir -p $(dir $@)
 	$(CXX) -c $< -o $@ $(COMMON_FLAGS) $(CPPFLAGS) $(CXXFLAGS) $(INCLUDEPATH:%=-I%) -MD -MP -MF ${@:.o=.d}
 
-.PHONY: clean buildall all
+.PHONY: clean buildall all unittests
 
 clean:
 	@echo $(SEPARATOR)
