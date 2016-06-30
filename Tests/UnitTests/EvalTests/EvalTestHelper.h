@@ -63,7 +63,7 @@ struct EvalFixture
                     if (!envVariableErrorMessage.empty())
                     {
                         BOOST_TEST_MESSAGE(envVariableErrorMessage);
-                        fprintf(stderr, envVariableErrorMessage.c_str());
+                        fprintf(stderr, "%s\n", envVariableErrorMessage.c_str());
                     }
 
                     newCurrentPath = m_testDataPath;

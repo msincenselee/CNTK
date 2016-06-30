@@ -21,6 +21,10 @@ BOOST_FIXTURE_TEST_SUITE(EvalTestSuite, EvalFixture)
 
 IEvaluateModelExtended<float>* SetupNetworkAndGetLayouts(std::string modelDefinition, VariableSchema& inputLayouts, VariableSchema& outputLayouts)
 {
+    // Native model evaluation instance
+    IEvaluateModelExtended<float> *eval;
+
+#ifdef _WIN32
     // Load the eval library
     auto hModule = LoadLibrary(L"evaldll.dll");
     if (hModule == nullptr)
@@ -33,10 +37,12 @@ IEvaluateModelExtended<float>* SetupNetworkAndGetLayouts(std::string modelDefini
     std::string func = "GetEvalExtendedF";
     auto procAddress = GetProcAddress(hModule, func.c_str());
     auto getEvalProc = (GetEvalProc<float>)procAddress;
-
-    // Native model evaluation instance
-    IEvaluateModelExtended<float> *eval;
+        
     getEvalProc(&eval);
+
+#else // on Linux
+    GetEvalExtendedF(&eval);
+#endif
 
     try
     {
