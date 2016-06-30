@@ -21,6 +21,7 @@ BlockRandomizer::BlockRandomizer(
     int verbosity,
     size_t randomizationRangeInSamples,
     IDataDeserializerPtr deserializer,
+    bool shouldRandomize,
     DecimationMode decimationMode,
     bool useLegacyRandomization,
     bool multithreadedGetNextSequence)
@@ -34,7 +35,9 @@ BlockRandomizer::BlockRandomizer(
       m_sweepTotalNumberOfSamples(0),
       m_lastSeenChunkId(CHUNKID_MAX),
       m_chunkRandomizer(std::make_shared<ChunkRandomizer>(deserializer, randomizationRangeInSamples, useLegacyRandomization)),
-      m_multithreadedGetNextSequences(multithreadedGetNextSequence)
+      m_multithreadedGetNextSequences(multithreadedGetNextSequence),
+      m_prefetchedChunk(CHUNKID_MAX),
+      m_shouldPrefetch(shouldRandomize)
 {
     assert(deserializer != nullptr);
 
@@ -278,12 +281,36 @@ void BlockRandomizer::RetrieveDataChunks()
     // TODO diagnostics for paged out chunks?
     m_chunks.swap(chunks);
 
+    // Identify next chunk to prefetch.
+    ChunkIdType toBePrefetched = GetChunkToPrefetch(window.begin() + randomizedEnd, window.end());
+
     // Adding new ones.
     for (size_t i = 0; i < randomizedEnd; ++i)
     {
-        if (needed[i])
+        if (!needed[i])
         {
-            auto const& chunk = window[i];
+            continue;
+        }
+
+        auto const& chunk = window[i];
+        if (chunk.m_original->m_id == m_prefetchedChunk && m_prefetch.valid())
+        {
+            // Taking prefetched chunk.
+            chunks[chunk.m_chunkId] = m_prefetch.get();
+            if (m_verbosity >= Information)
+                fprintf(stderr, "BlockRandomizer::RetrieveDataChunks: paged in prefetched chunk %u (original chunk: %u), now %" PRIu64 " chunks in memory\n",
+                chunk.m_chunkId,
+                chunk.m_original->m_id,
+                ++numLoadedChunks);
+        }
+        else
+        {
+            // Make sure we have no outstanding prefetches.
+            if (m_prefetch.valid())
+            {
+                m_prefetch.wait();
+            }
+
             m_chunks[chunk.m_original->m_id] = m_deserializer->GetChunk(chunk.m_original->m_id);
             if (m_verbosity >= Information)
                 fprintf(stderr, "BlockRandomizer::RetrieveDataChunks: paged in randomized chunk %u (original chunk: %u), now %" PRIu64 " chunks in memory\n",
@@ -293,11 +320,47 @@ void BlockRandomizer::RetrieveDataChunks()
         }
     }
 
+    Prefetch(toBePrefetched);
+
     if (m_verbosity >= Notification)
         fprintf(stderr, "BlockRandomizer::RetrieveDataChunks: %" PRIu64 " chunks paged-in from chunk window [%u..%u]\n",
                 m_chunks.size(),
                 window.front().m_chunkId,
                 window.back().m_chunkId);
+}
+
+template<class Iter>
+ChunkIdType BlockRandomizer::GetChunkToPrefetch(const Iter& begin, const Iter& end)
+{
+    auto current = begin;
+    ChunkIdType toBePrefetched = CHUNKID_MAX;
+    while (current != end)
+    {
+        if (m_chunks.find(current->m_chunkId) == m_chunks.end() &&
+            m_decimationMode == DecimationMode::chunk && current->m_chunkId % m_config.m_numberOfWorkers == m_config.m_workerRank)
+        {
+            toBePrefetched = current->m_original->m_id;
+            break;
+        }
+        ++current;
+    }
+    return toBePrefetched;
+}
+
+void BlockRandomizer::Prefetch(ChunkIdType chunkId)
+{
+    // Start new prefetch if necessary.
+    if (m_shouldPrefetch && m_prefetchedChunk != chunkId && chunkId != CHUNKID_MAX)
+    {
+        // Wait to make sure there is no outstanding prefetches.
+        if (m_prefetch.valid())
+        {
+            m_prefetch.wait();
+        }
+
+        m_prefetchedChunk = chunkId;
+        m_prefetch = std::async(launch::async, [this, chunkId]() { return m_deserializer->GetChunk(chunkId); });
+    }
 }
 
 }}}

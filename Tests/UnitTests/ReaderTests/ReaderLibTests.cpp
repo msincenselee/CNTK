@@ -161,7 +161,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerInstantiate)
     vector<float> data;
     auto mockDeserializer = make_shared<MockDeserializer>(0, 0, data);
 
-    auto randomizer = make_shared<BlockRandomizer>(0, SIZE_MAX, mockDeserializer, BlockRandomizer::DecimationMode::chunk, false);
+    auto randomizer = make_shared<BlockRandomizer>(0, SIZE_MAX, mockDeserializer, false, BlockRandomizer::DecimationMode::chunk, false);
 }
 
 BOOST_AUTO_TEST_CASE(BlockRandomizerOneEpoch)
@@ -170,7 +170,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerOneEpoch)
     iota(data.begin(), data.end(), 0.0f);
     auto mockDeserializer = make_shared<MockDeserializer>(5, 2, data);
 
-    auto randomizer = make_shared<BlockRandomizer>(0, SIZE_MAX, mockDeserializer, BlockRandomizer::DecimationMode::chunk, false);
+    auto randomizer = make_shared<BlockRandomizer>(0, SIZE_MAX, mockDeserializer, false, BlockRandomizer::DecimationMode::chunk, false);
 
     EpochConfiguration epochConfiguration;
     epochConfiguration.m_numberOfWorkers = 1;
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerOneEpochWithChunks1)
     iota(data.begin(), data.end(), 0.0f);
     auto mockDeserializer = make_shared<MockDeserializer>(5, 2, data);
 
-    auto randomizer = make_shared<BlockRandomizer>(0, 4, mockDeserializer, BlockRandomizer::DecimationMode::chunk, false);
+    auto randomizer = make_shared<BlockRandomizer>(0, 4, mockDeserializer, false, BlockRandomizer::DecimationMode::chunk, false);
 
     EpochConfiguration epochConfiguration;
     epochConfiguration.m_numberOfWorkers = 1;
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerOneEpochWithChunks2)
 
     auto mockDeserializer = make_shared<MockDeserializer>(10, 2, data);
 
-    auto randomizer = make_shared<BlockRandomizer>(0, 18, mockDeserializer, BlockRandomizer::DecimationMode::chunk, false);
+    auto randomizer = make_shared<BlockRandomizer>(0, 18, mockDeserializer, false, BlockRandomizer::DecimationMode::chunk, false);
 
     EpochConfiguration epochConfiguration;
     epochConfiguration.m_numberOfWorkers = 1;
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerChaosMonkey)
 
     auto mockDeserializer = make_shared<MockDeserializer>(numChunks, numSequencesPerChunk, data, sequenceLength);
 
-    auto randomizer = make_shared<BlockRandomizer>(0, windowSize, mockDeserializer, BlockRandomizer::DecimationMode::chunk, false);
+    auto randomizer = make_shared<BlockRandomizer>(0, windowSize, mockDeserializer, false, BlockRandomizer::DecimationMode::chunk, false);
 
     for (int t = 0; t < 100; t++)
     {
@@ -336,6 +336,7 @@ BOOST_AUTO_TEST_CASE(BlockRandomizerOneEpochLegacyRandomization)
     auto randomizer = make_shared<BlockRandomizer>(0,
         SIZE_MAX,
         mockDeserializer,
+        false,
         BlockRandomizer::DecimationMode::sequence,
         true);
 

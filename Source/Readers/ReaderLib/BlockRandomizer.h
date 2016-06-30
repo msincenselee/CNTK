@@ -11,6 +11,7 @@
 #include "DataDeserializer.h"
 #include "ChunkRandomizer.h"
 #include "SequenceRandomizer.h"
+#include <future>
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -45,6 +46,7 @@ public:
         int verbosity,
         size_t randomizationRangeInSamples,
         IDataDeserializerPtr deserializer,
+        bool shouldRandomize,
         DecimationMode decimationMode = DecimationMode::chunk,
         bool useLegacyRandomization = false,
         bool multithreadedGetNextSequences = false);
@@ -74,6 +76,13 @@ private:
 
     // Prepares a new sweep if needed.
     void PrepareNewSweepIfNeeded(size_t samplePosition);
+
+    // Asynchronously prefetches the chunk.
+    void Prefetch(ChunkIdType chunkId);
+
+    // Returns next candidate for the prefetch in the given range.
+    template<class Iter>
+    ChunkIdType GetChunkToPrefetch(const Iter& begin, const Iter& end);
 
     // Global sample position on the timeline.
     size_t m_globalSamplePosition;
@@ -131,6 +140,13 @@ private:
     };
 
     int m_verbosity;
+
+    // Flag that signifies whether to do chunk prefetching.
+    bool m_shouldPrefetch;
+    // Prefetch future.
+    std::future<ChunkPtr> m_prefetch;
+    // Prefetched original chunk id.
+    ChunkIdType m_prefetchedChunk;
 };
 
 }}}
