@@ -296,7 +296,7 @@ void BlockRandomizer::RetrieveDataChunks()
         if (chunk.m_original->m_id == m_prefetchedChunk && m_prefetch.valid())
         {
             // Taking prefetched chunk.
-            m_chunks[chunk.m_chunkId] = m_prefetch.get();
+            m_chunks[chunk.m_original->m_id] = m_prefetch.get();
             if (m_verbosity >= Information)
                 fprintf(stderr, "BlockRandomizer::RetrieveDataChunks: paged in prefetched chunk %u (original chunk: %u), now %" PRIu64 " chunks in memory\n",
                 chunk.m_chunkId,
